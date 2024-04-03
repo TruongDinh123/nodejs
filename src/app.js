@@ -3,34 +3,42 @@ const app = express();
 const cors = require("cors");
 const dotenv = require("dotenv");
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+//init middleware
+app.use(express.json({ limit: "100mb" }));
+
+app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 
 dotenv.config();
 
-require("./dbs/dbConnect");
-
 app.use(
   cors({
-    origin: "",
-    methods: "GET, POST, PUT, OPTIONS, DELETE",
+    origin: "*",
+    credentials: true,
+    methods: "GET,POST,PUT,DELETE",
   })
 );
 
+//intit db
+require("./dbs/dbConnect");
+// checkOverload();
+
+//init routes
 app.use("", require("./routes"));
 
+//handling error
 app.use((req, res, next) => {
-  const error = new Error("Không tồn tại");
+  const error = new Error("Not found");
   error.status = 404;
   next(error);
 });
 
 app.use((error, req, res, next) => {
-  const statusCode = error.status || 500;
+  console.log("🚀 ~ error:", error);
+  const statusCode = typeof error.status === "number" ? error.status : 500;
   return res.status(statusCode).json({
-    status: "Lỗi server",
+    status: "error",
     code: statusCode,
-    message: error.message || "Lỗi server",
+    message: error.message || "Internal Server Error",
   });
 });
 
