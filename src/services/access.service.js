@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const KeyTokenService = require("./keyToken.service");
 const { getInfoData } = require("../utils");
 const { createTokenPair } = require("../auth/authUtils");
+const { findByEmail } = require("../services/user.service");
 
 class AccessService {
   static signUp = async ({ name, email, password }) => {
@@ -69,6 +70,42 @@ class AccessService {
         status: "error",
       };
     }
+  };
+
+  static logIn = async ({ email, password, refreshToken = null } = null) => {
+    const foundShop = await findByEmail({ email });
+    if (!foundShop) {
+      throw new BadRequestError("Couldn't find an account for " + email);
+    }
+    const match = bcrypt.compare(password, foundShop.password);
+    if (!match) {
+      throw new BadRequestError("Couldn't compare password");
+    }
+
+    const privateKey = crypto.randomBytes(64).toString("hex");
+    const publicKey = crypto.randomBytes(64).toString("hex");
+
+    const { _id: userId } = foundShop;
+
+    const tokens = await createTokenPair(
+      { userId, email },
+      publicKey,
+      privateKey
+    );
+    await KeyTokenService.createKeyToken({
+      refreshToken: tokens.refreshToken,
+      privateKey,
+      publicKey,
+      userId,
+    });
+
+    return {
+      account: getInfoData({
+        fileds: ["_id", "email", "name", "roles"],
+        object: foundShop,
+      }),
+      tokens,
+    };
   };
 }
 
